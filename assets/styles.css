@@ -143,16 +143,22 @@ body.paused *,body.paused *::before,body.paused *::after{animation-play-state:pa
 
 /* hero estático: os cinco portões, idênticos no JS */
 .static-hero{display:none}
+#heroMobileVideo{display:none}
 @media (max-width:720px),(orientation:portrait) and (max-width:1024px),(orientation:portrait) and (pointer:coarse),(orientation:landscape) and (pointer:coarse) and (max-height:560px),(prefers-reduced-motion:reduce){
   .hero{height:100svh;min-height:640px}
   .stage{position:relative;height:100%;background:var(--canvas-2) url("hero-ending.jpg") center/cover no-repeat}
   .bands,#heroVideo,.ring,.cue,.poster{display:none}
+  /* clipe vertical em loop: playback linear é leve no celular, diferente do scrub */
+  #heroMobileVideo{display:block;position:absolute;inset:0;width:100%;height:100%;object-fit:cover;opacity:0;transition:opacity .6s var(--ease-out)}
+  .stage.mobile-video-ready #heroMobileVideo{opacity:1}
   .scrim{background:linear-gradient(180deg,rgba(10,10,18,.25),rgba(10,10,18,.35) 40%,rgba(10,10,18,.86) 100%)}
   .static-hero{position:absolute;left:0;right:0;bottom:0;display:grid;gap:1rem;padding:0 clamp(1.2rem,5vw,3rem) clamp(2.5rem,7vh,4rem);text-shadow:var(--tshadow)}
   .static-hero h1{font-size:clamp(2.2rem,1.4rem + 4.5vw,4rem);max-width:14ch}
   .static-hero .btn{justify-self:start;text-shadow:none}
   .static-hero .kicker{display:inline-block;justify-self:start;padding:.35rem .7rem;border-radius:10px;background:rgba(8,8,15,.55);border:1px solid rgba(96,96,126,.3);text-shadow:none}
 }
+/* quem pede menos movimento fica com a imagem parada, sem clipe nenhum */
+@media (prefers-reduced-motion:reduce){#heroMobileVideo{display:none}}
 
 /* ───────────────────────── página ───────────────────────── */
 .page{position:relative;z-index:1;background:linear-gradient(180deg,var(--canvas-2) 0,transparent 30vh)}

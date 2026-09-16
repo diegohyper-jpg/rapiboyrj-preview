@@ -51,11 +51,13 @@
   const stage = $('#stage');
   const hero = $('.hero');
   const video = $('#heroVideo');
+  const mobileVideo = $('#heroMobileVideo');
   const poster = $('.poster');
   const ring = $('.ring');
   const bands = $$('.band').map(el => ({ el, a: +el.dataset.a, b: +el.dataset.b, op: -1, k: -1 }));
   const VIDEO_URL = 'assets/hero-scrub.mp4';
-  const VIDEO_BYTES = 6414587; // tamanho real de assets/hero-scrub.mp4, recuo quando Content-Length falta
+  const VIDEO_BYTES = 4487271; // tamanho real de assets/hero-scrub.mp4, recuo quando Content-Length falta
+  const MOBILE_VIDEO_URL = 'assets/hero-mobile.mp4';
 
   let scrubOn = false, heroOnScreen = true, initDone = false, started = false;
   let target = 0, shown = 0, rafId = null, lastTick = 0, loadK = 0, loadStart = 0;
@@ -115,6 +117,10 @@
   new IntersectionObserver(entries => {
     heroOnScreen = entries[0].isIntersecting;
     if (heroOnScreen && scrubOn) onScroll();
+    if (mobileVideo && mobileVideo.src) {
+      if (heroOnScreen && !document.hidden) mobileVideo.play().catch(() => {});
+      else mobileVideo.pause();
+    }
   }, { threshold: 0 }).observe(hero);
 
   /* ───────── carregamento do vídeo como Blob (pôster primeiro, anel honesto) ───────── */
@@ -184,8 +190,33 @@
     removeEventListener('scroll', onScroll);
     if (rafId !== null) { cancelAnimationFrame(rafId); rafId = null; }
   }
+  /* ───────── hero no celular: clipe vertical em loop ─────────
+     o scrub depende de seek a cada quadro, que trava em celular. Playback
+     linear é o que o hardware do aparelho faz bem, então o hero de telas
+     pequenas ganha um clipe cortado em retrato tocando em loop. */
+  let mobileStarted = false;
+  async function startMobileVideo() {
+    if (mobileStarted || !mobileVideo || reduceMQ.matches) return;
+    mobileStarted = true;
+    try {
+      const res = await fetch(MOBILE_VIDEO_URL);
+      if (!res.ok) throw new Error('mobile video fetch failed');
+      mobileVideo.src = URL.createObjectURL(await res.blob());
+      await mobileVideo.play();
+      stage.classList.add('mobile-video-ready');
+    } catch {
+      mobileStarted = false; // o pôster do stage segura a cena sozinho
+    }
+  }
+  function stopMobileVideo() {
+    if (mobileVideo && !mobileVideo.paused) mobileVideo.pause();
+    stage.classList.remove('mobile-video-ready');
+    mobileStarted = false;
+  }
+
   function applyHeroMode() {
-    if (GATES.some(q => matchMedia(q).matches)) disableScrub(); else enableScrub();
+    if (GATES.some(q => matchMedia(q).matches)) { disableScrub(); startMobileVideo(); }
+    else { stopMobileVideo(); enableScrub(); }
   }
   const MQLS = GATES.map(q => matchMedia(q));
   MQLS.forEach(m => m.addEventListener('change', applyHeroMode));
@@ -235,7 +266,7 @@
   const carton = $('#cartonVideo');
   const playBtn = $('.play', player);
   let cartonBlobUrl = null, cartonLoading = false;
-  playBtn.addEventListener('click', async () => {
+  async function playCarton() {
     if (cartonLoading) return;
     if (cartonBlobUrl) {
       carton.play().then(() => player.classList.add('playing')).catch(() => {});
@@ -257,9 +288,16 @@
       cartonLoading = false;
       player.classList.remove('loading');
     }
-  });
+  }
+  playBtn.addEventListener('click', playCarton);
   carton.addEventListener('click', () => { if (!carton.paused) { carton.pause(); player.classList.remove('playing'); } });
-  new IntersectionObserver(entries => { if (!entries[0].isIntersecting && !carton.paused) { carton.pause(); player.classList.remove('playing'); } }).observe(player);
+  /* toca sozinho quando entra na tela: é mudo, então os navegadores permitem.
+     O botão continua ali como recuo quando o navegador recusa o autoplay. */
+  new IntersectionObserver(entries => {
+    const visible = entries[0].isIntersecting;
+    if (visible && !reduceMQ.matches && !document.hidden) playCarton();
+    else if (!visible && !carton.paused) { carton.pause(); player.classList.remove('playing'); }
+  }, { threshold: 0.35 }).observe(player);
 
   /* ───────── momento interativo: segurar para montar o time ───────── */
   const hold = $('#holdBtn');
