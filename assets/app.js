@@ -219,6 +219,27 @@
     if (mobileVideo && !mobileVideo.paused) mobileVideo.pause();
     stage.classList.remove('mobile-video-ready');
   }
+
+  /* no celular as legendas rolam empilhadas em vez de trocarem no mesmo lugar:
+     cada uma revela ao entrar na tela e monta o texto pelo mesmo --k do desktop */
+  const bandIO = new IntersectionObserver(entries => {
+    entries.forEach(e => {
+      if (!e.isIntersecting) return;
+      e.target.classList.add('in');
+      e.target.style.setProperty('--k', '1');
+    });
+  }, { threshold: 0.2 });
+  function revealBandsOnScroll() {
+    bands.forEach(b => bandIO.observe(b.el));
+  }
+  function stopRevealingBands() {
+    bands.forEach(b => {
+      bandIO.unobserve(b.el);
+      b.el.classList.remove('in');
+      b.el.style.removeProperty('--k');
+      b.el.style.removeProperty('opacity');
+    });
+  }
   /* voltar para a aba retoma o clipe; sair dela economiza bateria */
   document.addEventListener('visibilitychange', () => {
     if (!mobileVideo || !mobileVideo.src) return;
@@ -227,8 +248,8 @@
   });
 
   function applyHeroMode() {
-    if (GATES.some(q => matchMedia(q).matches)) { disableScrub(); startMobileVideo(); }
-    else { stopMobileVideo(); enableScrub(); }
+    if (GATES.some(q => matchMedia(q).matches)) { disableScrub(); startMobileVideo(); revealBandsOnScroll(); }
+    else { stopRevealingBands(); stopMobileVideo(); enableScrub(); }
   }
   const MQLS = GATES.map(q => matchMedia(q));
   MQLS.forEach(m => m.addEventListener('change', applyHeroMode));
