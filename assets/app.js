@@ -226,13 +226,37 @@
   $$('.rv').forEach(el => io.observe(el));
   $$('.stop').forEach(el => io.observe(el));
 
-  /* ───────── player do carton: toca só quando o visitante pede ───────── */
+  /* ───────── player do carton: toca só quando o visitante pede ─────────
+     busca como Blob antes de tocar: alguns hosts servem mal o pedido por
+     partes (Range) que o <video src> nativo depende, e o carregamento
+     trava sem aviso (o mesmo motivo do hero usar Blob). O clipe é
+     pequeno, então a busca simples de uma vez basta. */
   const player = $('#player');
   const carton = $('#cartonVideo');
   const playBtn = $('.play', player);
-  playBtn.addEventListener('click', () => {
-    if (!carton.src) carton.src = 'assets/carton.mp4';
-    carton.play().then(() => player.classList.add('playing')).catch(() => {});
+  let cartonBlobUrl = null, cartonLoading = false;
+  playBtn.addEventListener('click', async () => {
+    if (cartonLoading) return;
+    if (cartonBlobUrl) {
+      carton.play().then(() => player.classList.add('playing')).catch(() => {});
+      return;
+    }
+    cartonLoading = true;
+    player.classList.add('loading');
+    try {
+      const res = await fetch('assets/carton.mp4');
+      if (!res.ok) throw new Error('carton fetch failed');
+      cartonBlobUrl = URL.createObjectURL(await res.blob());
+      carton.src = cartonBlobUrl;
+      await carton.play();
+      player.classList.add('playing');
+    } catch {
+      carton.src = 'assets/carton.mp4';
+      carton.play().then(() => player.classList.add('playing')).catch(() => {});
+    } finally {
+      cartonLoading = false;
+      player.classList.remove('loading');
+    }
   });
   carton.addEventListener('click', () => { if (!carton.paused) { carton.pause(); player.classList.remove('playing'); } });
   new IntersectionObserver(entries => { if (!entries[0].isIntersecting && !carton.paused) { carton.pause(); player.classList.remove('playing'); } }).observe(player);
