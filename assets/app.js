@@ -195,15 +195,22 @@
      linear é o que o hardware do aparelho faz bem, então o hero de telas
      pequenas ganha um clipe cortado em retrato tocando em loop. */
   let mobileStarted = false;
+  /* a classe só entra quando o clipe REALMENTE toca: se o navegador recusar
+     (bateria, aba no fundo), o pôster segura a cena e uma nova tentativa
+     ainda pode assumir depois. */
+  if (mobileVideo) {
+    mobileVideo.addEventListener('playing', () => stage.classList.add('mobile-video-ready'));
+  }
   async function startMobileVideo() {
-    if (mobileStarted || !mobileVideo || reduceMQ.matches) return;
+    if (!mobileVideo || reduceMQ.matches) return;
+    if (mobileVideo.src) { mobileVideo.play().catch(() => {}); return; }
+    if (mobileStarted) return;
     mobileStarted = true;
     try {
       const res = await fetch(MOBILE_VIDEO_URL);
       if (!res.ok) throw new Error('mobile video fetch failed');
       mobileVideo.src = URL.createObjectURL(await res.blob());
       await mobileVideo.play();
-      stage.classList.add('mobile-video-ready');
     } catch {
       mobileStarted = false; // o pôster do stage segura a cena sozinho
     }
@@ -211,8 +218,13 @@
   function stopMobileVideo() {
     if (mobileVideo && !mobileVideo.paused) mobileVideo.pause();
     stage.classList.remove('mobile-video-ready');
-    mobileStarted = false;
   }
+  /* voltar para a aba retoma o clipe; sair dela economiza bateria */
+  document.addEventListener('visibilitychange', () => {
+    if (!mobileVideo || !mobileVideo.src) return;
+    if (document.hidden) mobileVideo.pause();
+    else if (heroOnScreen && GATES.some(q => matchMedia(q).matches)) mobileVideo.play().catch(() => {});
+  });
 
   function applyHeroMode() {
     if (GATES.some(q => matchMedia(q).matches)) { disableScrub(); startMobileVideo(); }
